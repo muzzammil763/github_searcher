@@ -27,13 +27,6 @@
         .btn-primary:hover {
             background: #1d4ed8;
         }
-        .btn-secondary {
-            background: #4b5563;
-            color: white;
-        }
-        .btn-secondary:hover {
-            background: #374151;
-        }
         .error {
             background: #fee2e2;
             color: #dc2626;
@@ -56,24 +49,6 @@
             font-family: monospace;
             white-space: pre-wrap;
             word-break: break-all;
-        }
-        .code-viewer {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            padding: 1rem;
-            border-radius: 4px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            overflow-x: auto;
-        }
-        .tab {
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-        }
-        .tab.active {
-            border-bottom: 2px solid #2563eb;
-            color: #2563eb;
         }
     </style>
 </head>
@@ -126,75 +101,20 @@
 
                 <!-- Search Section -->
                 <div class="mb-4">
-                    <h2 class="text-xl font-bold mb-2">Search GitHub</h2>
-                    
-                    <!-- Search Tabs -->
-                    <div class="flex border-b mb-4">
-                        <div class="tab active" onclick="setSearchType('repositories')" id="tabRepositories">Repositories</div>
-                        <div class="tab" onclick="setSearchType('users')" id="tabUsers">Users</div>
-                        <div class="tab" onclick="setSearchType('myrepos')" id="tabMyRepos">My Repositories</div>
-                    </div>
-
-                    <!-- Search Controls -->
-                    <div class="space-y-2">
-                        <div class="flex gap-2">
-                            <input type="text" id="searchInput" placeholder="Search..." 
-                                   class="flex-1 p-2 border rounded">
-                            <button onclick="performSearch()" class="btn btn-primary">Search</button>
-                        </div>
-                        
-                        <!-- Repository Filters -->
-                        <div id="repoFilters" class="flex gap-2">
-                            <select id="language" class="p-2 border rounded">
-                                <option value="">Any Language</option>
-                                <option value="javascript">JavaScript</option>
-                                <option value="python">Python</option>
-                                <option value="java">Java</option>
-                                <option value="cpp">C++</option>
-                            </select>
-                            <select id="sort" class="p-2 border rounded">
-                                <option value="best-match">Best Match</option>
-                                <option value="stars">Stars</option>
-                                <option value="forks">Forks</option>
-                                <option value="updated">Recently Updated</option>
-                            </select>
-                        </div>
+                    <h2 class="text-xl font-bold mb-2">Search Repositories</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="searchInput" placeholder="Search repositories..." 
+                               class="flex-1 p-2 border rounded">
+                        <button onclick="searchRepositories()" class="btn btn-primary">Search</button>
                     </div>
                 </div>
 
                 <div id="searchResults" class="space-y-4"></div>
-
-                <!-- Code Viewer Modal -->
-                <div id="codeViewerModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
-                    <div class="bg-white rounded-lg p-4 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold" id="codeViewerTitle">Repository Contents</h3>
-                            <button onclick="closeCodeViewer()" class="btn btn-secondary">Close</button>
-                        </div>
-                        <div id="codeViewerContent" class="code-viewer"></div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let currentSearchType = 'repositories';
-        let currentUser = '';
-
-        function setSearchType(type) {
-            currentSearchType = type;
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(`tab${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
-            
-            // Show/hide filters based on search type
-            document.getElementById('repoFilters').style.display = 
-                (type === 'repositories' || type === 'myrepos') ? 'flex' : 'none';
-            
-            // Clear previous results
-            document.getElementById('searchResults').innerHTML = '';
-        }
-
         async function validateToken() {
             const token = document.getElementById('token').value.trim();
             const tokenStatus = document.getElementById('tokenStatus');
@@ -206,120 +126,142 @@
                 return;
             }
 
+            // Clear previous messages
+            tokenStatus.classList.add('hidden');
+            debugInfo.classList.add('hidden');
+
             try {
                 const response = await fetch('https://api.github.com/user', {
+                    method: 'GET',
                     headers: {
                         'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
                     }
                 });
 
                 const data = await response.json();
 
+                // Show debug info
+                debugInfo.textContent = `Status: ${response.status}\nHeaders: ${JSON.stringify(Object.fromEntries(response.headers), null, 2)}\nResponse: ${JSON.stringify(data, null, 2)}`;
+                debugInfo.classList.remove('hidden');
+
                 if (response.ok) {
-                    currentUser = data.login;
                     showMessage(`✅ Token validated successfully! Logged in as ${data.login}`, 'success');
                     mainContent.classList.remove('hidden');
+                    // Test repository listing
+                    testRepoListing(token);
                 } else {
                     showMessage(`❌ Token validation failed: ${data.message}`, 'error');
                     mainContent.classList.add('hidden');
                 }
             } catch (err) {
-                showMessage('❌ Connection error', 'error');
+                showMessage('❌ Connection error. Please try:', 'error');
+                const debugInfo = document.getElementById('debugInfo');
+                debugInfo.textContent = `Error details:\n${err.message}\n\nTroubleshooting steps:\n1. Check your internet connection\n2. Make sure you're using a valid token\n3. Try opening this file using a local server instead of directly opening it\n4. Check if your browser is blocking the request`;
+                debugInfo.classList.remove('hidden');
+            }
+        }
+
+        async function testRepoListing(token) {
+            try {
+                const response = await fetch('https://api.github.com/user/repos', {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(`✅ Successfully connected to GitHub! Found ${data.length} repositories.`, 'success');
+                }
+            } catch (err) {
+                showMessage('⚠️ Connected to GitHub but cannot list repositories. Check token permissions.', 'error');
+            }
+        }
+
+        async function createRepository() {
+            const token = document.getElementById('token').value;
+            const name = document.getElementById('newRepoName').value;
+            const description = document.getElementById('newRepoDescription').value;
+            const isPrivate = document.getElementById('repoVisibility').value === 'true';
+
+            if (!name) {
+                showMessage('Please enter a repository name', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('https://api.github.com/user/repos', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        private: isPrivate,
+                        auto_init: true
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage(`✅ Repository "${name}" created successfully!`, 'success');
+                    document.getElementById('newRepoName').value = '';
+                    document.getElementById('newRepoDescription').value = '';
+                } else {
+                    showMessage(`❌ Failed to create repository: ${data.message}`, 'error');
+                }
+
+                // Show debug info
+                const debugInfo = document.getElementById('debugInfo');
+                debugInfo.textContent = `Response: ${JSON.stringify(data, null, 2)}`;
+                debugInfo.classList.remove('hidden');
+
+            } catch (err) {
+                showMessage('❌ Failed to create repository', 'error');
+                const debugInfo = document.getElementById('debugInfo');
                 debugInfo.textContent = `Error: ${err.message}`;
                 debugInfo.classList.remove('hidden');
             }
         }
 
-        async function performSearch() {
+        async function searchRepositories() {
             const query = document.getElementById('searchInput').value;
             const token = document.getElementById('token').value;
             const resultsDiv = document.getElementById('searchResults');
-            const language = document.getElementById('language').value;
-            const sort = document.getElementById('sort').value;
 
             if (!query) {
                 showMessage('Please enter a search query', 'error');
                 return;
             }
 
-            let apiUrl;
-            let queryParams = new URLSearchParams();
-
-            switch (currentSearchType) {
-                case 'repositories':
-                    apiUrl = 'https://api.github.com/search/repositories';
-                    queryParams.append('q', `${query}${language ? ` language:${language}` : ''}`);
-                    queryParams.append('sort', sort === 'best-match' ? '' : sort);
-                    break;
-                case 'users':
-                    apiUrl = 'https://api.github.com/search/users';
-                    queryParams.append('q', query);
-                    break;
-                case 'myrepos':
-                    apiUrl = `https://api.github.com/user/repos`;
-                    queryParams.append('sort', sort === 'best-match' ? 'updated' : sort);
-                    break;
-            }
-
             try {
-                const response = await fetch(`${apiUrl}?${queryParams}`, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
+                const response = await fetch(
+                    `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}`,
+                    {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
                     }
-                });
+                );
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    resultsDiv.innerHTML = '';
-                    
-                    const items = currentSearchType === 'myrepos' ? data : data.items;
-                    
-                    if (currentSearchType === 'myrepos' && query) {
-                        items = items.filter(repo => 
-                            repo.name.toLowerCase().includes(query.toLowerCase()) ||
-                            (repo.description && repo.description.toLowerCase().includes(query.toLowerCase()))
-                        );
-                    }
-
-                    items.forEach(item => {
-                        const card = document.createElement('div');
-                        card.className = 'card';
-
-                        if (currentSearchType === 'users') {
-                            card.innerHTML = `
-                                <div class="flex items-center gap-4">
-                                    <img src="${item.avatar_url}" alt="${item.login}" class="w-16 h-16 rounded-full">
-                                    <div>
-                                        <h3 class="text-lg font-semibold">${item.login}</h3>
-                                        <a href="${item.html_url}" target="_blank" class="text-blue-500 hover:underline">View Profile</a>
-                                    </div>
-                                </div>
-                            `;
-                        } else {
-                            card.innerHTML = `
-                                <h3 class="text-lg font-semibold">${item.full_name}</h3>
-                                <p class="text-sm text-gray-500 mb-2">${item.description || ''}</p>
-                                <div class="flex items-center gap-4 mb-2">
-                                    <span>⭐ ${item.stargazers_count}</span>
-                                    <span>🍴 ${item.forks_count}</span>
-                                    ${item.language ? `<span>📝 ${item.language}</span>` : ''}
-                                </div>
-                                <div class="flex gap-2">
-                                    <a href="${item.html_url}" target="_blank" class="text-blue-500 hover:underline">View on GitHub</a>
-                                    <button onclick="viewCode('${item.full_name}')" class="btn btn-secondary">View Code</button>
-                                </div>
-                            `;
-                        }
-                        
-                        resultsDiv.appendChild(card);
-                    });
-
-                    if (items.length === 0) {
-                        resultsDiv.innerHTML = '<p class="text-gray-500">No results found.</p>';
-                    }
+                    resultsDiv.innerHTML = data.items.map(repo => `
+                        <div class="card">
+                            <h3 class="text-lg font-semibold">${repo.full_name}</h3>
+                            <p class="text-sm text-gray-500">${repo.description || ''}</p>
+                            <p class="text-sm text-gray-500">⭐ ${repo.stargazers_count} | 🍴 ${repo.forks_count}</p>
+                            <a href="${repo.html_url}" target="_blank" class="text-blue-500 hover:underline">View on GitHub</a>
+                        </div>
+                    `).join('');
                 } else {
                     showMessage(`❌ Search failed: ${data.message}`, 'error');
                 }
@@ -331,33 +273,17 @@
             }
         }
 
-        async function viewCode(repoFullName) {
-            const token = document.getElementById('token').value;
-            const modal = document.getElementById('codeViewerModal');
-            const content = document.getElementById('codeViewerContent');
-            const title = document.getElementById('codeViewerTitle');
+        function showMessage(message, type = 'error') {
+            const tokenStatus = document.getElementById('tokenStatus');
+            tokenStatus.textContent = message;
+            tokenStatus.className = type === 'error' ? 'error' : 'success';
+            tokenStatus.classList.remove('hidden');
+        }
 
-            try {
-                const response = await fetch(`https://api.github.com/repos/${repoFullName}/contents`, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    title.textContent = `Repository: ${repoFullName}`;
-                    content.innerHTML = data.map(file => `
-                        <div class="mb-2">
-                            <span class="mr-2">${file.type === 'dir' ? '📁' : '📄'}</span>
-                            <a href="${file.html_url}" target="_blank" class="text-blue-400 hover:underline">
-                                ${file.name}
-                            </a>
-                        </div>
-                    `).join('');
-                    
-                    modal.classList.remove('hidden');
-                } else {
-                    showMessage(`❌ Failed to fetch repository
+        // Enter key triggers search
+        document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchRepositories();
+        });
+    </script>
+</body>
+</html>
