@@ -1,32 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitHub Repository Manager</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <style>
-        .hidden { display: none; }
+        .hidden {
+            display: none;
+        }
+
         .card {
             background: white;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             padding: 1rem;
             margin-bottom: 1rem;
         }
+
         .btn {
             padding: 0.5rem 1rem;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 500;
         }
+
         .btn-primary {
             background: #2563eb;
             color: white;
         }
+
         .btn-primary:hover {
             background: #1d4ed8;
         }
+
+        .btn-secondary {
+            background: #4b5563;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #374151;
+        }
+
         .error {
             background: #fee2e2;
             color: #dc2626;
@@ -34,6 +51,7 @@
             border-radius: 4px;
             margin: 1rem 0;
         }
+
         .success {
             background: #dcfce7;
             color: #16a34a;
@@ -41,6 +59,7 @@
             border-radius: 4px;
             margin: 1rem 0;
         }
+
         .debug-info {
             background: #f3f4f6;
             padding: 1rem;
@@ -50,18 +69,43 @@
             white-space: pre-wrap;
             word-break: break-all;
         }
+
+        .code-viewer {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .file-list li {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .file-list li:hover {
+            background: #f3f4f6;
+        }
     </style>
 </head>
+
 <body class="bg-gray-100 p-4">
     <div class="max-w-6xl mx-auto">
         <div class="card">
             <h1 class="text-2xl font-bold mb-4">GitHub Repository Manager</h1>
-            
-            <!-- Token Section -->
+
             <div class="mb-4">
                 <div class="flex gap-2 mb-2">
-                    <input type="password" id="token" placeholder="Enter GitHub Personal Access Token" 
-                           class="flex-1 p-2 border rounded">
+                    <input type="password" id="token" placeholder="Enter GitHub Personal Access Token"
+                        class="flex-1 p-2 border rounded">
                     <button onclick="validateToken()" class="btn btn-primary">Validate Token</button>
                 </div>
                 <p class="text-sm text-gray-500 mb-2">How to get a token:</p>
@@ -79,16 +123,14 @@
             <div id="tokenStatus" class="hidden"></div>
             <div id="debugInfo" class="debug-info hidden"></div>
 
-            <!-- Main Content -->
             <div id="mainContent" class="hidden">
-                <!-- Create Repository Section -->
                 <div class="mb-4">
                     <h2 class="text-xl font-bold mb-2">Create New Repository</h2>
                     <div class="space-y-2">
-                        <input type="text" id="newRepoName" placeholder="Repository name" 
-                               class="w-full p-2 border rounded">
-                        <textarea id="newRepoDescription" placeholder="Repository description (optional)" 
-                                  class="w-full p-2 border rounded"></textarea>
+                        <input type="text" id="newRepoName" placeholder="Repository name"
+                            class="w-full p-2 border rounded">
+                        <textarea id="newRepoDescription" placeholder="Repository description (optional)"
+                            class="w-full p-2 border rounded"></textarea>
                         <div class="flex gap-2">
                             <select id="repoVisibility" class="p-2 border rounded">
                                 <option value="false">Public</option>
@@ -99,20 +141,39 @@
                     </div>
                 </div>
 
-                <!-- Search Section -->
                 <div class="mb-4">
                     <h2 class="text-xl font-bold mb-2">Search Repositories</h2>
                     <div class="flex gap-2">
-                        <input type="text" id="searchInput" placeholder="Search repositories..." 
-                               class="flex-1 p-2 border rounded">
+                        <input type="text" id="searchInput" placeholder="Search repositories..."
+                            class="flex-1 p-2 border rounded">
                         <button onclick="searchRepositories()" class="btn btn-primary">Search</button>
                     </div>
                 </div>
 
                 <div id="searchResults" class="space-y-4"></div>
+
+                <div id="codeViewerModal"
+                    class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div class="bg-white rounded-lg p-4 w-11/12 h-5/6 overflow-hidden flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold" id="codeViewerTitle">Repository Contents</h3>
+                            <button onclick="closeCodeViewer()" class="btn btn-secondary">Close</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 flex-1 overflow-hidden">
+                            <div class="border rounded p-4 overflow-y-auto">
+                                <h4 class="font-bold mb-2">Files</h4>
+                                <ul id="fileList" class="file-list"></ul>
+                            </div>
+                            <div class="col-span-2 border rounded overflow-hidden">
+                                <div id="codeViewer" class="code-viewer h-full overflow-y-auto"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
 
     <script>
         async function validateToken() {
@@ -120,54 +181,44 @@
             const tokenStatus = document.getElementById('tokenStatus');
             const mainContent = document.getElementById('mainContent');
             const debugInfo = document.getElementById('debugInfo');
-
+    
             if (!token) {
                 showMessage('Please enter a token first', 'error');
                 return;
             }
-
-            // Clear previous messages
-            tokenStatus.classList.add('hidden');
-            debugInfo.classList.add('hidden');
-
+    
             try {
                 const response = await fetch('https://api.github.com/user', {
-                    method: 'GET',
                     headers: {
-                        'Authorization': `token ${token}`,
+                        'Authorization': `Bearer ${token}`,
                         'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json',
                     }
                 });
-
+    
                 const data = await response.json();
-
-                // Show debug info
-                debugInfo.textContent = `Status: ${response.status}\nHeaders: ${JSON.stringify(Object.fromEntries(response.headers), null, 2)}\nResponse: ${JSON.stringify(data, null, 2)}`;
+                debugInfo.textContent = `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
                 debugInfo.classList.remove('hidden');
-
+    
                 if (response.ok) {
                     showMessage(`✅ Token validated successfully! Logged in as ${data.login}`, 'success');
                     mainContent.classList.remove('hidden');
-                    // Test repository listing
                     testRepoListing(token);
                 } else {
                     showMessage(`❌ Token validation failed: ${data.message}`, 'error');
                     mainContent.classList.add('hidden');
                 }
             } catch (err) {
-                showMessage('❌ Connection error. Please try:', 'error');
-                const debugInfo = document.getElementById('debugInfo');
-                debugInfo.textContent = `Error details:\n${err.message}\n\nTroubleshooting steps:\n1. Check your internet connection\n2. Make sure you're using a valid token\n3. Try opening this file using a local server instead of directly opening it\n4. Check if your browser is blocking the request`;
+                showMessage('❌ Connection error', 'error');
+                debugInfo.textContent = `Error: ${err.message}`;
                 debugInfo.classList.remove('hidden');
             }
         }
-
+    
         async function testRepoListing(token) {
             try {
                 const response = await fetch('https://api.github.com/user/repos', {
                     headers: {
-                        'Authorization': `token ${token}`,
+                        'Authorization': `Bearer ${token}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
@@ -179,56 +230,182 @@
                 showMessage('⚠️ Connected to GitHub but cannot list repositories. Check token permissions.', 'error');
             }
         }
-
-        async function createRepository() {
+    
+        async function searchRepositories() {
+            const query = document.getElementById('searchInput').value;
             const token = document.getElementById('token').value;
-            const name = document.getElementById('newRepoName').value;
-            const description = document.getElementById('newRepoDescription').value;
-            const isPrivate = document.getElementById('repoVisibility').value === 'true';
-
-            if (!name) {
-                showMessage('Please enter a repository name', 'error');
+            const resultsDiv = document.getElementById('searchResults');
+    
+            if (!query) {
+                showMessage('Please enter a search query', 'error');
                 return;
             }
-
+    
             try {
-                const response = await fetch('https://api.github.com/user/repos', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        name,
-                        description,
-                        private: isPrivate,
-                        auto_init: true
-                    })
-                });
-
+                const response = await fetch(
+                    `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+    
                 const data = await response.json();
-                
+    
                 if (response.ok) {
-                    showMessage(`✅ Repository "${name}" created successfully!`, 'success');
-                    document.getElementById('newRepoName').value = '';
-                    document.getElementById('newRepoDescription').value = '';
+                    resultsDiv.innerHTML = data.items.map(repo => `
+                        <div class="card">
+                            <h3 class="text-lg font-semibold">${repo.full_name}</h3>
+                            <p class="text-sm text-gray-500">${repo.description || ''}</p>
+                            <p class="text-sm text-gray-500">⭐ ${repo.stargazers_count} | 🍴 ${repo.forks_count}</p>
+                            <div class="flex gap-2 mt-2">
+                                <a href="${repo.html_url}" target="_blank" class="text-blue-500 hover:underline">View on GitHub</a>
+                                <button onclick="viewCode('${repo.full_name}')" class="btn btn-secondary">View Code</button>
+                            </div>
+                        </div>
+                    `).join('');
                 } else {
-                    showMessage(`❌ Failed to create repository: ${data.message}`, 'error');
+                    showMessage(`❌ Search failed: ${data.message}`, 'error');
                 }
-
-                // Show debug info
-                const debugInfo = document.getElementById('debugInfo');
-                debugInfo.textContent = `Response: ${JSON.stringify(data, null, 2)}`;
-                debugInfo.classList.remove('hidden');
-
             } catch (err) {
-                showMessage('❌ Failed to create repository', 'error');
+                showMessage('❌ Search failed', 'error');
                 const debugInfo = document.getElementById('debugInfo');
                 debugInfo.textContent = `Error: ${err.message}`;
                 debugInfo.classList.remove('hidden');
             }
         }
+    
+        async function viewCode(repoFullName, path = '') {
+            const token = document.getElementById('token').value;
+            const modal = document.getElementById('codeViewerModal');
+            const fileList = document.getElementById('fileList');
+            const codeViewer = document.getElementById('codeViewer');
+            const title = document.getElementById('codeViewerTitle');
+    
+            modal.classList.remove('hidden');
+            title.textContent = `Repository: ${repoFullName}`;
+            fileList.innerHTML = '<li class="text-gray-500">Loading...</li>';
+            codeViewer.textContent = 'Select a file to view its contents';
+    
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${repoFullName}/contents/${path}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+    
+                const data = await response.json();
+    
+                if (response.ok) {
+                    let breadcrumb = `
+                        <li class="px-2 py-1 bg-gray-100 rounded mb-2 hover:bg-gray-200 cursor-pointer" 
+                            onclick="viewCode('${repoFullName}', '')">
+                            📁 Root
+                        </li>`;
+    
+                    if (path) {
+                        const parts = path.split('/');
+                        let currentPath = '';
+                        parts.forEach((part, index) => {
+                            currentPath += (index > 0 ? '/' : '') + part;
+                            breadcrumb += `
+                                <li class="px-2 py-1 bg-gray-100 rounded mb-2 hover:bg-gray-200 cursor-pointer" 
+                                    onclick="viewCode('${repoFullName}', '${currentPath}')">
+                                    📁 ${part}
+                                </li>`;
+                        });
+                    }
+    
+                    fileList.innerHTML = `
+                        <div class="mb-4 space-y-1">
+                            ${breadcrumb}
+                        </div>
+                        <ul class="space-y-1">
+                            ${Array.isArray(data) ? data.map(item => `
+                                <li onclick="${item.type === 'dir' 
+                                    ? `viewCode('${repoFullName}', '${item.path}')`
+                                    : `viewFile('${repoFullName}', '${item.path}')`}"
+                                    class="hover:bg-gray-100 px-2 py-1 rounded cursor-pointer">
+                                    ${item.type === 'dir' ? '📁' : '📄'} ${item.name}
+                                </li>
+                            `).join('') : ''}
+                        </ul>`;
+                } else {
+                    fileList.innerHTML = `<li class="text-red-500">Error: ${data.message}</li>`;
+                }
+            } catch (err) {
+                fileList.innerHTML = `<li class="text-red-500">Error loading files: ${err.message}</li>`;
+            }
+        }
+    
+        async function viewFile(repoFullName, path) {
+            const token = document.getElementById('token').value;
+            const codeViewer = document.getElementById('codeViewer');
+    
+            codeViewer.textContent = 'Loading...';
+    
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${repoFullName}/contents/${path}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+    
+                const data = await response.json();
+    
+                if (response.ok) {
+                    if (data.type === 'file') {
+                        try {
+                            const content = atob(data.content.replace(/\s/g, ''));
+                            codeViewer.textContent = content;
+                        } catch (e) {
+                            codeViewer.textContent = 'Unable to decode file content. This might be a binary file.';
+                        }
+                    } else if (data.type === 'dir') {
+                        viewCode(repoFullName, path);
+                    } else {
+                        codeViewer.textContent = 'Unsupported file type';
+                    }
+                } else {
+                    codeViewer.textContent = `Error: ${data.message}`;
+                }
+            } catch (err) {
+                codeViewer.textContent = `Error loading file: ${err.message}`;
+            }
+        }
+    
+        function showMessage(message, type = 'error') {
+            const tokenStatus = document.getElementById('tokenStatus');
+            tokenStatus.textContent = message;
+            tokenStatus.className = type === 'error' ? 'error' : 'success';
+            tokenStatus.classList.remove('hidden');
+        }
+    
+        function closeCodeViewer() {
+            document.getElementById('codeViewerModal').classList.add('hidden');
+        }
+    
+        document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchRepositories();
+        });
+    
+        document.getElementById('token')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') validateToken();
+        });
+    </script>
+
+
+    <script>
 
         async function searchRepositories() {
             const query = document.getElementById('searchInput').value;
@@ -259,7 +436,10 @@
                             <h3 class="text-lg font-semibold">${repo.full_name}</h3>
                             <p class="text-sm text-gray-500">${repo.description || ''}</p>
                             <p class="text-sm text-gray-500">⭐ ${repo.stargazers_count} | 🍴 ${repo.forks_count}</p>
-                            <a href="${repo.html_url}" target="_blank" class="text-blue-500 hover:underline">View on GitHub</a>
+                            <div class="flex gap-2 mt-2">
+                                <a href="${repo.html_url}" target="_blank" class="text-blue-500 hover:underline">View on GitHub</a>
+                                <button onclick="viewCode('${repo.full_name}')" class="btn btn-secondary">View Code</button>
+                            </div>
                         </div>
                     `).join('');
                 } else {
@@ -272,18 +452,152 @@
                 debugInfo.classList.remove('hidden');
             }
         }
+        async function viewCode(repoFullName, path = '') {
+            const token = document.getElementById('token').value;
+            const modal = document.getElementById('codeViewerModal');
+            const fileList = document.getElementById('fileList');
+            const codeViewer = document.getElementById('codeViewer');
+            const title = document.getElementById('codeViewerTitle');
 
-        function showMessage(message, type = 'error') {
-            const tokenStatus = document.getElementById('tokenStatus');
-            tokenStatus.textContent = message;
-            tokenStatus.className = type === 'error' ? 'error' : 'success';
-            tokenStatus.classList.remove('hidden');
+            modal.classList.remove('hidden');
+            title.textContent = `Repository: ${repoFullName}`;
+            fileList.innerHTML = '<li class="text-gray-500">Loading...</li>';
+            codeViewer.textContent = 'Select a file to view its contents';
+
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${repoFullName}/contents/${path}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Add breadcrumb navigation
+                    let breadcrumb = `
+                <li class="px-2 py-1 bg-gray-100 rounded mb-2 hover:bg-gray-200 cursor-pointer" 
+                    onclick="viewCode('${repoFullName}', '')">
+                    📁 Root
+                </li>`;
+
+                    if (path) {
+                        const parts = path.split('/');
+                        let currentPath = '';
+                        parts.forEach((part, index) => {
+                            currentPath += (index > 0 ? '/' : '') + part;
+                            breadcrumb += `
+                        <li class="px-2 py-1 bg-gray-100 rounded mb-2 hover:bg-gray-200 cursor-pointer" 
+                            onclick="viewCode('${repoFullName}', '${currentPath}')">
+                            📁 ${part}
+                        </li>`;
+                        });
+                    }
+
+                    fileList.innerHTML = `
+                <div class="mb-4 space-y-1">
+                    ${breadcrumb}
+                </div>
+                <ul class="space-y-1">
+                    ${Array.isArray(data) ? data.map(item => `
+                        <li onclick="${item.type === 'dir'
+                            ? `viewCode('${repoFullName}', '${item.path}')`
+                            : `viewFile('${repoFullName}', '${item.path}')`}"
+                            class="hover:bg-gray-100 px-2 py-1 rounded cursor-pointer">
+                            ${item.type === 'dir' ? '📁' : '📄'} ${item.name}
+                        </li>
+                    `).join('') : ''}
+                </ul>`;
+                } else {
+                    fileList.innerHTML = `<li class="text-red-500">Error: ${data.message}</li>`;
+                }
+            } catch (err) {
+                fileList.innerHTML = `<li class="text-red-500">Error loading files: ${err.message}</li>`;
+            }
         }
 
-        // Enter key triggers search
-        document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') searchRepositories();
-        });
+        async function viewFile(repoFullName, path) {
+            const token = document.getElementById('token').value;
+            const codeViewer = document.getElementById('codeViewer');
+
+            codeViewer.textContent = 'Loading...';
+
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${repoFullName}/contents/${path}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.type === 'file') {
+                        try {
+                            const content = atob(data.content.replace(/\s/g, ''));
+                            codeViewer.textContent = content;
+                        } catch (e) {
+                            codeViewer.textContent = 'Unable to decode file content. This might be a binary file.';
+                        }
+                    } else if (data.type === 'dir') {
+                        viewCode(repoFullName, path);
+                    } else {
+                        codeViewer.textContent = 'Unsupported file type';
+                    }
+                } else {
+                    codeViewer.textContent = `Error: ${data.message}`;
+                }
+            } catch (err) {
+                codeViewer.textContent = `Error loading file: ${err.message}`;
+            }
+        }
+
+        const token = document.getElementById('token').value;
+        const codeViewer = document.getElementById('codeViewer');
+
+        codeViewer.textContent = 'Loading...';
+
+        try {
+            const response = await fetch(
+                `https://api.github.com/repos/${repoFullName}/contents/${path}`,
+                {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.type === 'file') {
+                    const content = atob(data.content);
+                    codeViewer.textContent = content;
+                } else {
+                    codeViewer.textContent = 'This is a directory. Please select a file to view its contents.';
+                }
+            } else {
+                codeViewer.textContent = `Error: ${data.message}`;
+            }
+        } catch (err) {
+            codeViewer.textContent = `Error loading file: ${err.message}`;
+        }
+
+
+        function closeCodeViewer() {
+            document.getElementById('codeViewerModal').classList.add('hidden');
+        }
+
     </script>
 </body>
+
 </html>
